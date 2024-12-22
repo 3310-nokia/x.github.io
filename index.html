@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Accurate BTC Price Prediction</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 20px;
+      background-color: #f7f7f7;
+    }
+    h1 {
+      color: #333;
+    }
+    .price {
+      font-size: 24px;
+      margin: 10px 0;
+      font-weight: bold;
+    }
+    .prediction {
+      margin: 20px 0;
+      font-size: 18px;
+      color: #555;
+    }
+    canvas {
+      max-width: 800px;
+      margin: 20px auto;
+    }
+  </style>
+</head>
+<body>
+  <h1>Accurate BTC Price Prediction</h1>
+  <div class="price">Current BTC Price: <span id="currentPrice">$0</span></div>
+  <canvas id="priceChart"></canvas>
+  <div class="prediction">
+    <p>Predicted Price (1 hour later): <span id="predicted1h">$0</span></p>
+    <p>Predicted Price (12 hours later): <span id="predicted12h">$0</span></p>
+    <p>Predicted Price (1 day later): <span id="predicted1d">$0</span></p>
+  </div>
+
+  <script>
+    // Initialize chart.js
+    const ctx = document.getElementById('priceChart').getContext('2d');
+    const priceChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: [], // Time labels
+        datasets: [{
+          label: 'BTC Price',
+          data: [], // Price data
+          borderColor: 'rgba(75, 192, 192, 1)',
+          borderWidth: 2,
+          fill: false
+        }]
+      },
+      options: {
+        responsive: true,
+        scales: {
+          x: {
+            title: {
+              display: true,
+              text: 'Time'
+            }
+          },
+          y: {
+            title: {
+              display: true,
+              text: 'Price (USD)'
+            },
+            beginAtZero: false
+          }
+        }
+      }
+    });
+
+    // Fetch real-time BTC price from Binance API
+    async function fetchBTCPrice() {
+      try {
+        const response = await fetch('https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT');
+        const data = await response.json();
+        return parseFloat(data.price);
+      } catch (error) {
+        console.error("Error fetching BTC price:", error);
+        return null;
+      }
+    }
+
+    // Moving Average Prediction
+    function movingAverage(prices, period) {
+      if (prices.length < period) return null;
+      const sum = prices.slice(-period).reduce((acc, price) => acc + price, 0);
+      return sum / period;
+    }
+
+    function predictPrices(prices) {
+      const period = 10; // Use last 10 data points
+      const avg = movingAverage(prices, period);
+      if (avg === null) {
+        return {
+          next1h: prices[prices.length - 1] || 0,
+          next12h: prices[prices.length - 1] || 0,
+          next1d: prices[prices.length - 1] || 0
+        };
+      }
+
+      // Predict future prices based on moving average
+      return {
+        next1h: avg,
+        next12h: avg,
+        next1d: avg
+      };
+    }
+
+    // Update chart and predictions
+    async function updateChart() {
+      const price = await fetchBTCPrice();
+      if (price === null) return;
+
+      const now = new Date().toLocaleTimeString();
+
+      // Update current price display
+      document.getElementById('currentPrice').textContent = `$${price.toFixed(2)}`;
+
+      // Update chart data
+      priceChart.data.labels.push(now);
+      priceChart.data.datasets[0].data.push(price);
+      priceChart.update();
+
+      // Predict future prices
+      const predictions = predictPrices(priceChart.data.datasets[0].data);
+      document.getElementById('predicted1h').textContent = `$${predictions.next1h.toFixed(2)}`;
+      document.getElementById('predicted12h').textContent = `$${predictions.next12h.toFixed(2)}`;
+      document.getElementById('predicted1d').textContent = `$${predictions.next1d.toFixed(2)}`;
+    }
+
+    // Update chart every minute
+    setInterval(updateChart, 60000);
+    updateChart(); // Initial call
+  </script>
+</body>
+</html>
